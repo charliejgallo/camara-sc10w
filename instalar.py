@@ -143,7 +143,7 @@ def main():
         while time.time() < fin and not any("login" in l for l in vio[-3:] + [c.linea]):
             c._leer(1, vio.append)
         if any("login" in l for l in vio[-3:] + [c.linea]):
-            print("Arranco OpenIPC: usuario root, clave 12345 (cambiala con passwd).")
+            print("Arranco OpenIPC: entra con usuario root, acepta el aviso con \"I Agree\" y elegi tu clave (Paso 10).")
             return 0
         print("No vi el login de OpenIPC en 4 minutos: mira la consola (" + registro.name + ").")
         return 1

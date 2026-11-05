@@ -504,12 +504,15 @@ Todavía no tiene red, porque falta la WiFi.
    python3 -m serial.tools.miniterm PUERTO 115200
    ```
 
-   Enter. Usuario **`root`**, clave **`12345`**.
-2. **Cambiá la clave:**
+   Enter y usuario **`root`**.
+2. **Aceptá el aviso y elegí tu clave.** La primera vez, OpenIPC muestra un
+   aviso (disclaimer):
+   - leelo y, para aceptarlo, escribí **`I Agree`** tal cual (con
+     mayúsculas y el espacio) y Enter;
+   - después te pide que **elijas tu propia clave**. Es
+     la que vas a usar en la consola, en la página web y por SSH.
 
-   ```
-   passwd
-   ```
+   Si más adelante la querés cambiar, con `passwd`.
 
 3. **Configurá la WiFi:**
 
