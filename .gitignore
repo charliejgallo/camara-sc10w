@@ -1,0 +1,15 @@
+# The camera's own firmware and console logs are private: never in git
+volcado/
+*.bin
+!firmware/*.bin
+*-consola.txt
+*.bin.part
+*.bin.after
+
+# Working notes between sessions, not part of the tutorial
+HANDOFF*.md
+INSTALAR-OPENIPC.md
+
+.DS_Store
+__pycache__/
+sd/
