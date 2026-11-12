@@ -43,7 +43,10 @@ login. Without --writable, anything that writes is refused, as below.
 kill -USR1 <its pid> unplugs it: the next byte that comes in powers it on.
 
 --noise P garbles each byte of md's output with probability P, to exercise
-the Programador's per-chunk CRC and its retries.
+the Programador's per-chunk CRC and its retries. --eat-newline P drops md's
+last line break with probability P, so the prompt comes glued to md's last
+line - a byte lost by a cheap adapter at the worst place (2026-11-12: a
+friend's dump stopped on "no volvio el prompt").
 
 The flash is made up, laid out as the SC10W's (mtdparts in bootargs):
 512K boot (U-Boot), 2560K kernel (a uImage at 0x80000), 12800K rootfs (a
@@ -422,11 +425,15 @@ class Camera:
                 cells = " ".join(f"{v:02x}" for v in row)
             asc = "".join(chr(c) if 32 <= c < 127 else "." for c in row)
             out.append(f"{a + o:08x}: {cells}    {asc}\n")
-            if len(out) == 256:
+            if len(out) == 256 and o + 16 < n:      # the last batch keeps the end, for --eat-newline
                 self.send("".join(out), noisy=True)
                 out = []
         if out:
-            self.send("".join(out), noisy=True)
+            tail = "".join(out)
+            if self.a.eat_newline and self.rnd.random() < self.a.eat_newline:
+                tail = tail[:-1]                    # the prompt comes glued to the last line
+                self.count("md newline eaten")
+            self.send(tail, noisy=True)
 
     def summary(self):
         log(f"commands: {self.counts}")
@@ -486,6 +493,7 @@ def main():
     s.add_argument("--stop-key", default="q", help='the one key that stops it ("q", " ", "\\x1b"...)')
     s.add_argument("--bdinfo", action="store_true")
     s.add_argument("--noise", type=float, default=0.0)
+    s.add_argument("--eat-newline", type=float, default=0.0, help="probability that md's last line break is lost")
     s.add_argument("--max-baud", type=int, default=921600)
     s.add_argument("--flash-out")
     a = p.parse_args()

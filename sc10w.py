@@ -13,6 +13,12 @@ Que hace:
 - manda comandos y junta lo que contestan hasta que vuelve el prompt;
 - lee la RAM de la camara con "md.l" y la verifica con su propio "crc32".
 
+Si se pierde un byte en el peor lugar (un adaptador barato, un hub), el
+prompt puede llegar pegado a la ultima linea de "md", o no llegar: entonces
+se recupera el prompt con Ctrl+C y Enter y se sigue con lo que llego; la
+verificacion por crc32 vuelve a pedir lo que falte. Antes eso cortaba todo
+con "no volvio el prompt".
+
 Probado con una Orvibo SC10W (Hi3518EV200, U-Boot 2010.06 de HiSilicon) y,
 sin camara, contra tools/fake_uboot.py de P4OS.
 """
@@ -144,15 +150,37 @@ class Consola:
                 ultimo = time.time()
             if self.en_prompt():
                 return lineas
+            # el prompt pegado a la ultima linea (se perdio su salto de linea):
+            # cuando ya no llega nada mas. Esa ultima linea se pierde; crc32 lo nota.
+            if self.prompt and self.linea.endswith(self.prompt) and time.time() - ultimo > 0.3:
+                self.linea = self.prompt
+                return lineas
             if time.time() - ultimo > espera:
+                if self.recuperar_prompt():
+                    return lineas
                 raise RuntimeError(f"'{cmd}' no termino: no volvio el prompt en {espera} s")
 
-    def crc32(self, addr, n):
-        """El CRC32 que calcula la camara de su RAM (el mismo que zlib.crc32)."""
-        for l in self.comando(f"crc32 0x{addr:x} 0x{n:x}"):
-            m = re.search(r"==>\s*([0-9a-fA-F]{8})", l)
-            if m:
-                return int(m.group(1), 16)
+    def recuperar_prompt(self, intentos=3):
+        """El prompt no volvio (se perdio en el cable): Ctrl+C y Enter hasta
+        que vuelva. True si volvio."""
+        for _ in range(intentos):
+            self.ser.write(b"\x03")
+            self._leer(0.3)
+            self.linea = ""
+            self.ser.write(b"\r")
+            self._leer(0.6)
+            if self.en_prompt():
+                return True
+        return False
+
+    def crc32(self, addr, n, intentos=3):
+        """El CRC32 que calcula la camara de su RAM (el mismo que zlib.crc32).
+        Si la respuesta llego mal, se pide otra vez; None si nunca llego."""
+        for _ in range(intentos):
+            for l in self.comando(f"crc32 0x{addr:x} 0x{n:x}"):
+                m = re.search(r"==>\s*([0-9a-fA-F]{8})", l)
+                if m:
+                    return int(m.group(1), 16)
         return None
 
     def leer_ram(self, addr, n):
@@ -176,7 +204,8 @@ class Consola:
 
     def leer_verificado(self, addr, n, intentos=4):
         """La RAM, verificada contra el crc32 de la camara. Si no coincide, el
-        crc32 de cada 4 KB dice que parte vino mal y solo esa se repite."""
+        crc32 de cada 4 KB dice que parte vino mal y solo esa se repite; si
+        sigue mal, de a 256 bytes (_reparar_fino)."""
         quiere = self.crc32(addr, n)
         if quiere is None:
             raise RuntimeError("Este U-Boot no tiene crc32")
@@ -189,13 +218,28 @@ class Consola:
             for o in range(0, n, 4096):
                 m = min(4096, n - o)
                 w = self.crc32(addr + o, m)
-                for _ in range(4):
+                for k in range(4):
                     if zlib.crc32(buf[o:o + m]) == w:
                         break
-                    buf[o:o + m] = self.leer_ram(addr + o, m)
+                    if k < 2:
+                        buf[o:o + m] = self.leer_ram(addr + o, m)
+                    else:
+                        self._reparar_fino(buf, addr, o, m)
         if zlib.crc32(buf) != quiere:
             raise RuntimeError(f"0x{addr:x}: no salio bien en {intentos} intentos")
         return buf
+
+    def _reparar_fino(self, buf, addr, o, m, paso=256, intentos=6):
+        """Un pedazo de 4 KB que sigue mal: de a 256 bytes, cada uno contra su
+        crc32 y repetido solo si hace falta. Con mucho ruido en el cable, 4 KB
+        (unos 19 mil caracteres de md) rara vez llegan enteros; 256 bytes si."""
+        for p in range(o, o + m, paso):
+            q = min(paso, o + m - p)
+            w = self.crc32(addr + p, q)
+            for _ in range(intentos):
+                if w is None or zlib.crc32(buf[p:p + q]) == w:
+                    break
+                buf[p:p + q] = self.leer_ram(addr + p, q)
 
     def cerrar(self):
         self.ser.close()

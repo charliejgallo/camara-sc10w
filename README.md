@@ -604,6 +604,7 @@ reinicia con el firmware de fábrica tal cual estaba.
 | No sale nada | TXD y RXD sin cruzar, o el adaptador en otro puerto | Invertir TXD/RXD; revisar el puerto (Paso 3) |
 | Sale bien pero no se frena ("arranco Linux sin frenarse") | Las teclas empezaron tarde | Correr el script **antes** de enchufar la cámara, y enchufarla recién cuando diga "prendé la cámara" |
 | `volcar.py` dice "no salió bien en 4 intentos" | Muchos errores en el cable | Cables más cortos, lejos del parlante, y la fuente buena. Volver a correr |
+| `volcar.py` corta con "'md.l 0x82000000 0x4000' no termino: no volvio el prompt en 10 s" | Un byte perdido justo al final de un `md` (un adaptador barato, un hub USB): el prompt llega pegado a la última línea, o no llega | Bajá el `sc10w.py` nuevo (desde el 2026-11-12): recupera el prompt solo y repite lo que falte. Probado con un falso que pierde la mitad de esos saltos de línea y un byte cada 5000 |
 | `instalar.py` no ve el archivo en la microSD | La tarjeta no es FAT32, o tiene varias particiones, o el nombre no coincide | Formatearla de nuevo (Paso 8); mismo nombre que `--imagen` |
 | El CRC de la RAM no coincide (paso 3 del script) | El archivo de la tarjeta no es el mismo que `--imagen`, o la tarjeta falla | Volver a copiarlo; probar otra tarjeta. No se tocó la flash |
 | El CRC de la flash no coincide después de grabar | Raro: la flash o la alimentación | El script repite solo. **No desenchufar** |
